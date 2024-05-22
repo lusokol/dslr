@@ -28,6 +28,14 @@ def displayStats(stats):
     df_transposed = df.set_index(' ').T
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', None)
+    pd.options.display.colheader_justify = 'center'
+
+    def truncate_col_name(col_name, max_length=15):
+        if len(col_name) > max_length:
+            return col_name[:6] + '...' + col_name[-6:]
+        return col_name
+
+    df_transposed.columns = [truncate_col_name(col) for col in df_transposed.columns]
     print(df_transposed)
 
 def main():

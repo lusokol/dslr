@@ -1,0 +1,14 @@
+     Index Hogwarts House  ...     Charms Flying
+0        0      Ravenclaw  ... -232.79405 -26.89
+1        2      Ravenclaw  ... -227.34265  30.42
+2       14      Ravenclaw  ... -232.65964 -19.94
+3       15      Ravenclaw  ... -229.38229  17.00
+4       18      Ravenclaw  ... -226.76896  11.22
+..     ...            ...  ...        ...    ...
+438   1576      Ravenclaw  ... -230.67354  -9.50
+439   1577      Ravenclaw  ... -230.11765 -52.11
+440   1582      Ravenclaw  ... -229.14767 -12.93
+441   1590      Ravenclaw  ... -229.84860  17.86
+442   1593      Ravenclaw  ... -230.80139 -29.82
+
+[443 rows x 19 columns]

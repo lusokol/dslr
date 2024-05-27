@@ -1,4 +1,4 @@
-from load_csv import load
+from utils import load
 import matplotlib.pyplot as plt
 import pandas as pd
 from tqdm import tqdm

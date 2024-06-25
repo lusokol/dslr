@@ -1,107 +1,123 @@
-import csv
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.metrics import accuracy_score
 
-class LogisticRegression(object):
-  """Logistic Regression classifier
+class LogisticRegression:
+    def __init__(self, learning_rate=0.1, max_iterations=50, regularization_param=0, initial_weights=None, classes=None):
+        self.learning_rate = learning_rate
+        self.max_iterations = max_iterations
+        self.regularization_param = regularization_param
+        self.weights = initial_weights
+        self.classes = classes
+        self.errors = []
+        self.costs = []
 
-  Parameters
-  ----------
-  eta: float, default: 0.1
-    Learning rate (between 0.0 and 1.0)
-  max_iter: int, default: 50
-    Max passes over the training dataset
-  Lambda: float, default: 0
-    Regularization term
+    def fit(self, X, y, initial_weights=None):
+        self.classes = np.unique(y).tolist()
+        X_bias = np.insert(X, 0, 1, axis=1)
+        num_samples = X_bias.shape[0]
 
-  Attributes
-  ----------
-  _w: {array-like}, shape = [n_class, n_feature]
-    Weights after fitting
-  _errors: list
-    Number of misclassifications in every epoch
-  _cost: list
-    Number of cost values
-  """
-  def __init__(self, eta=0.1, max_iter=50, Lambda=0, initial_weight=None, multi_class=None):
-    self.eta = eta
-    self.max_iter = max_iter
-    self.Lambda = Lambda
-    self._w = initial_weight
-    self._K = multi_class
-    self._errors = []
-    self._cost = []
+        # initiate every weights at zero
+        if initial_weights is None:
+            self.weights = np.zeros(X_bias.shape[1] * len(self.classes))
+        self.weights = self.weights.reshape(len(self.classes), X_bias.shape[1])
 
-  def fit(self, X, y, sample_weight=None):
-    """Fit training data
+        # one hot incoding for houses
+        y_one_hot = np.zeros((len(y), len(self.classes)))
+        for i in range(len(y)):
+            y_one_hot[i, self.classes.index(y[i])] = 1
 
-    Parameters
-    ----------
-    X: {array-like}, shape = [n_samples, n_features]
-      Training vectors
-    y: array-like, shape = [n_samples]
-      Target values
-    sample_weight: 1d-array, default: None
-      Initial weights
+        # gradient descent
+        self.batch_gradient_descent(X_bias, y_one_hot, num_samples, X, y)
+        # self.stochastic_gradient_descent(X_bias, y_one_hot, num_samples, X)
 
-    Return
-    ------
-    self: object
-    """
-    self._K = np.unique(y).tolist()
-    newX = np.insert(X, 0, 1, axis=1)
-    m = newX.shape[0]
+        cost = self.costs
+        iterations = range(len(cost))
 
-    self._w = sample_weight
-    if not self._w:
-      self._w = np.zeros(newX.shape[1] * len(self._K))
-    self._w = self._w.reshape(len(self._K), newX.shape[1])
+        # Tracé de la fonction de coût
+        plt.figure(figsize=(12, 6))
 
-    yVec = np.zeros((len(y), len(self._K)))
-    for i in range(0, len(y)):
-      yVec[i, self._K.index(y[i])] = 1
+        plt.subplot(1, 2, 1)
+        plt.plot(iterations, cost, label='Fonction de coût')
+        plt.xlabel('Nombre d\'itérations')
+        plt.ylabel('Coût')
+        plt.title('Évolution de la fonction de coût')
+        plt.legend()
 
-    for _ in range(0, self.max_iter):
-      predictions = self.net_input(newX).T
+        # Tracé des erreurs de classification
+        plt.subplot(1, 2, 2)
+        plt.plot(iterations, self.errors, label='Erreurs de classification', color='red')
+        plt.xlabel('Nombre d\'itérations')
+        plt.ylabel('Nombre d\'erreurs')
+        plt.title('Évolution des erreurs de classification')
+        plt.legend()
 
-      lhs = yVec.T.dot(np.log(predictions))
-      rhs = (1 - yVec).T.dot(np.log(1 - predictions))
+        plt.tight_layout()
+        plt.show()
 
-      r1 = (self.Lambda / (2 * m)) * sum(sum(self._w[:, 1:] ** 2))
-      cost = (-1 / m) * sum(lhs + rhs) + r1
-      self._cost.append(cost)
-      self._errors.append(sum(y != self.predict(X)))
+        return self
 
-      r2 = (self.Lambda / m) * self._w[:, 1:]
-      self._w = self._w - (self.eta * (1 / m) * (predictions - yVec).T.dot(newX) + np.insert(r2, 0, 0, axis=1))
-    return self
+    def batch_gradient_descent(self, X_bias, y_one_hot, num_samples, X, y):
+      for _ in range(self.max_iterations):
+            probabilities = self._net_input(X_bias).T
+            log_likelihood = y_one_hot.T.dot(np.log(probabilities)) + (1 - y_one_hot).T.dot(np.log(1 - probabilities))
+            regularization_term = (self.regularization_param / (2 * num_samples)) * np.sum(self.weights[:, 1:] ** 2)
+            cost = (-1 / num_samples) * np.sum(log_likelihood) + regularization_term
+            self.costs.append(cost)
+            self.errors.append(np.sum(y != self.predict(X)))
+            print(self.errors)
+            gradient = (1 / num_samples) * (probabilities - y_one_hot).T.dot(X_bias)
+            regularization_gradient = (self.regularization_param / num_samples) * np.insert(self.weights[:, 1:], 0, 0, axis=1)
+            self.weights -= self.learning_rate * (gradient + regularization_gradient)
 
-  def net_input(self, X):
-    return self.sigmoid(self._w.dot(X.T))
+    def stochastic_gradient_descent(self, X_bias, y_one_hot, num_samples, X):
+        pbar = tqdm(total=self.max_iterations, desc='Iterations')
+        for _ in range(self.max_iterations):
+            for i in range(num_samples):
+                xi = X_bias[i].reshape(1, -1)
+                yi = y_one_hot[i].reshape(1, -1)
+                prediction = self._net_input(xi).T
 
-  def predict(self, X):
-    X = np.insert(X, 0, 1, axis=1)
-    predictions = self.net_input(X).T
-    return [self._K[x] for x in predictions.argmax(1)]
+                lhs = yi.T.dot(np.log(prediction))
+                rhs = (1 - yi).T.dot(np.log(1 - prediction))
 
-  def save_model(self, sc, filename='../datasets/weights.csv'):
-    f = open(filename, 'w+')
+                regularization_term = (self.regularization_param / (2 * num_samples)) * np.sum(np.sum(self.weights[:, 1:] ** 2))
+                cost = (-1 / num_samples) * np.sum(lhs + rhs) + regularization_term
+                self.costs.append(cost)
+                self.errors.append(np.sum(np.argmax(y_one_hot, axis=1) != self.predict(X)))
 
-    for i in range(0, len(self._K)):
-      f.write(f'{self._K[i]},')
-    f.write('Mean,Std\n')
+                gradient_regularization_term = (self.regularization_param / num_samples) * self.weights[:, 1:]
+                self.weights = self.weights - (self.learning_rate * (1 / num_samples) * (prediction - yi).T.dot(xi) + np.insert(gradient_regularization_term, 0, 0, axis=1))
+            pbar.update(1)
+        pbar.close()
 
-    for j in range(0, self._w.shape[1]):
-      for i in range(0, self._w.shape[0]):
-        f.write(f'{self._w[i][j]},')
-      f.write(f'{sc._mean[j - 1] if j > 0 else ""},{sc._std[j - 1] if j > 0 else ""}\n')
 
-    f.close()
-    return self
+    def _net_input(self, X):
+        return self._sigmoid(np.dot(self.weights, X.T))
 
-  def sigmoid(self, z):
-    g = 1.0 / (1.0 + np.exp(-z))
-    return g
+    def predict(self, X):
+        X_bias = np.insert(X, 0, 1, axis=1)
+        probabilities = self._net_input(X_bias).T
+        return [self.classes[i] for i in probabilities.argmax(axis=1)]
+
+    def save_model(self, scaler, filepath='../datasets/weights.csv'):
+        with open(filepath, 'w+') as file:
+            file.write(','.join(map(str, self.classes)) + ',Mean,Std\n')
+
+            for j in range(self.weights.shape[1]):
+                file.write(','.join(map(str, self.weights[:, j])) + ',')
+                if j > 0:
+                    file.write(f'{scaler._mean[j - 1]},{scaler._std[j - 1]}\n')
+                else:
+                    file.write(',\n')
+        return self
+
+    @staticmethod
+    def _sigmoid(z):
+        return 1 / (1 + np.exp(-z))
 
 
 def train_test_split(X, y, test_size=0.3, random_state=None):
@@ -194,30 +210,32 @@ class StandardScaler(object):
     """
     return ((X - self._mean) / self._std)
 ###################################
-df = pd.read_csv('students.csv')
-df = df.dropna(subset=['Defense Against the Dark Arts'])
-df = df.dropna(subset=['Charms'])
-df = df.dropna(subset=['Herbology'])
-df = df.dropna(subset=['Divination'])
-df = df.dropna(subset=['Muggle Studies'])
-df = df.dropna(subset=['Astronomy'])
-df = df.dropna(subset=['Ancient Runes'])
-df = df.dropna(subset=['History of Magic'])
-model = LogisticRegression(eta=0.01, max_iter=1000, Lambda=10)
+if __name__ == "__main__":
+  df = pd.read_csv('students.csv')
+  df = df.dropna(subset=['Defense Against the Dark Arts'])
+  df = df.dropna(subset=['Charms'])
+  df = df.dropna(subset=['Herbology'])
+  df = df.dropna(subset=['Divination'])
+  df = df.dropna(subset=['Muggle Studies'])
+  df = df.dropna(subset=['Astronomy'])
+  df = df.dropna(subset=['Ancient Runes'])
+  df = df.dropna(subset=['History of Magic'])
+  model = LogisticRegression(learning_rate=0.01, max_iterations=25, regularization_param=10)
 
-X = np.array(df.values[:, [7, 8, 9, 10, 11, 12, 13, 17]], dtype=float)
-y = df.values[:, 1]
+  X = np.array(df.values[:, [7, 8, 9, 10, 11, 12, 13, 17]], dtype=float)
+  y = df.values[:, 1]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=4)
+  X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=4)
 
-sc = StandardScaler()
-sc.fit(X_train)
+  sc = StandardScaler()
+  sc.fit(X_train)
 
-X_train_std = sc.transform(X_train)
-X_test_std = sc.transform(X_test)
+  X_train_std = sc.transform(X_train)
+  X_test_std = sc.transform(X_test)
 
-model.fit(X_train_std, y_train)
-y_pred = model.predict(X_test_std)
+  model.fit(X_train_std, y_train)
+  y_pred = model.predict(X_test_std)
 
-print(f'Misclasified samples: {sum(y_test != y_pred)}')
-model.save_model(sc)
+  print(f'Misclasified samples: {sum(y_test != y_pred)}/{len(y_test)}')
+  print(f'Accuracy: {accuracy_score(y_test, y_pred):.2f}')
+  model.save_model(sc)

@@ -1,4 +1,4 @@
-from load_csv import load
+from utils import load
 import numpy as np
 import pandas as pd
 import math

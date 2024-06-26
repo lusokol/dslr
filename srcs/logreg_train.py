@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 
 class LogisticRegression:
-    def __init__(self, learning_rate=0.1, max_iterations=50, regularization_param=0, initial_weights=None, classes=None):
+    def __init__(self, learning_rate=0.1, max_iterations=50, regularization_param=0, initial_weights=None, classes=None, method="batch", batch_size=10):
         self.learning_rate = learning_rate
         self.max_iterations = max_iterations
         self.regularization_param = regularization_param
@@ -14,6 +14,8 @@ class LogisticRegression:
         self.classes = classes
         self.errors = []
         self.costs = []
+        self.method = method
+        self.batch_size = batch_size
 
     def fit(self, X, y, initial_weights=None):
         self.classes = np.unique(y).tolist()
@@ -31,8 +33,12 @@ class LogisticRegression:
             y_one_hot[i, self.classes.index(y[i])] = 1
 
         # gradient descent
-        self.batch_gradient_descent(X_bias, y_one_hot, num_samples, X, y)
-        # self.stochastic_gradient_descent(X_bias, y_one_hot, num_samples, X)
+        if self.method == "batch":
+          self.batch_gradient_descent(X_bias, y_one_hot, num_samples, X, y)
+        elif self.method == "stochastic":
+          self.stochastic_gradient_descent(X_bias, y_one_hot, num_samples, X, y)
+        elif self.method == "mini_batch":
+          self.mini_batch_gradient_descent(X_bias, y_one_hot, num_samples, X, y)
 
         cost = self.costs
         iterations = range(len(cost))
@@ -73,7 +79,7 @@ class LogisticRegression:
             regularization_gradient = (self.regularization_param / num_samples) * np.insert(self.weights[:, 1:], 0, 0, axis=1)
             self.weights -= self.learning_rate * (gradient + regularization_gradient)
 
-    def stochastic_gradient_descent(self, X_bias, y_one_hot, num_samples, X):
+    def stochastic_gradient_descent(self, X_bias, y_one_hot, num_samples, X, y):
         pbar = tqdm(total=self.max_iterations, desc='Iterations')
         for _ in range(self.max_iterations):
             for i in range(num_samples):
@@ -87,12 +93,37 @@ class LogisticRegression:
                 regularization_term = (self.regularization_param / (2 * num_samples)) * np.sum(np.sum(self.weights[:, 1:] ** 2))
                 cost = (-1 / num_samples) * np.sum(lhs + rhs) + regularization_term
                 self.costs.append(cost)
-                self.errors.append(np.sum(np.argmax(y_one_hot, axis=1) != self.predict(X)))
+                self.errors.append(np.sum(y != self.predict(X)))
 
                 gradient_regularization_term = (self.regularization_param / num_samples) * self.weights[:, 1:]
                 self.weights = self.weights - (self.learning_rate * (1 / num_samples) * (prediction - yi).T.dot(xi) + np.insert(gradient_regularization_term, 0, 0, axis=1))
             pbar.update(1)
         pbar.close()
+
+
+    def mini_batch_gradient_descent(self, X_bias, y_one_hot, num_samples, X, y):
+        for _ in range(self.max_iterations):
+            indices = np.arange(num_samples)
+            np.random.shuffle(indices)
+            for start_idx in range(0, num_samples, self.batch_size):
+                end_idx = min(start_idx + self.batch_size, num_samples)
+                batch_indices = indices[start_idx:end_idx]
+                X_batch = X_bias[batch_indices]
+                y_batch = y_one_hot[batch_indices]
+
+                predictions = self._net_input(X_batch).T
+
+                lhs = y_batch.T.dot(np.log(predictions))
+                rhs = (1 - y_batch).T.dot(np.log(1 - predictions))
+
+                regularization_term = (self.regularization_param / (2 * num_samples)) * np.sum(np.sum(self.weights[:, 1:] ** 2))
+                cost = (-1 / num_samples) * np.sum(lhs + rhs) + regularization_term
+                self.costs.append(cost)
+                # self.errors.append(np.sum(np.argmax(y_one_hot, axis=1) != self.predict(X_bias)))
+                self.errors.append(np.sum(y != self.predict(X)))
+
+                gradient_regularization_term = (self.regularization_param / num_samples) * self.weights[:, 1:]
+                self.weights = self.weights - (self.learning_rate * (1 / num_samples) * (predictions - y_batch).T.dot(X_batch) + np.insert(gradient_regularization_term, 0, 0, axis=1))
 
 
     def _net_input(self, X):
@@ -220,7 +251,9 @@ if __name__ == "__main__":
   df = df.dropna(subset=['Astronomy'])
   df = df.dropna(subset=['Ancient Runes'])
   df = df.dropna(subset=['History of Magic'])
-  model = LogisticRegression(learning_rate=0.01, max_iterations=25, regularization_param=10)
+  # model = LogisticRegression(learning_rate=0.01, max_iterations=50, regularization_param=0, method="batch")
+  # model = LogisticRegression(learning_rate=0.01, max_iterations=25, regularization_param=0.5, method="stochastic")
+  model = LogisticRegression(learning_rate=0.01, max_iterations=50, regularization_param=10)
 
   X = np.array(df.values[:, [7, 8, 9, 10, 11, 12, 13, 17]], dtype=float)
   y = df.values[:, 1]

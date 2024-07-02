@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 
 def splitHouses(dataset):
@@ -7,7 +8,7 @@ def splitHouses(dataset):
         if student[1] in houses:
             houses[student[1]].append(student)
         else:
-            raise AssertionError("Someone isn't in one of the four houses!")
+            raise AssertionError("Invalid dataset: Someone isn't in one of the four houses!")
 
     # Convert each list to a DataFrame and add a column for the house
     columns = ['Index', 'Hogwarts House', 'First Name', 'Last Name', 'Birthday', 'Best Hand', 'Arithmancy', 'Astronomy', 'Herbology', 'Defense Against the Dark Arts', 'Divination', 'Muggle Studies', 'Ancient Runes', 'History of Magic', 'Transfiguration', 'Potions', 'Care of Magical Creatures', 'Charms', 'Flying']
@@ -37,3 +38,20 @@ Parse error and return dataset.
     except AssertionError as error:
         print(f"AssertionError: {error}")
         exit()
+
+def mean_(X):
+  total = 0
+  for x in X:
+    if np.isnan(x):
+      continue
+    total = total + x
+  return total / len(X)
+
+def std_(X):
+  mean = mean_(X)
+  total = 0
+  for x in X:
+    if np.isnan(x):
+      continue
+    total = total + (x - mean) ** 2
+  return (total / len(X)) ** 0.5
